@@ -5,6 +5,8 @@
 
 import random, time, pygame, sys
 from pygame.locals import *
+from copy import deepcopy 
+
 
 FPS = 25
 WINDOWWIDTH = 640
@@ -187,14 +189,35 @@ def runGame():
 
     while True: # game loop
         if fallingPiece == None:
+
+
+
+
+            ##print board
+
             for i in board:
                 print i;
+
+            #aggregate_height_num = _calc_height(board);
+            #print aggregate_height_num;
+            #print _calc_holes(board,aggregate_height_num);
+            ##print board
+
+
+            ##   attemp  ##
+            # copy_board = deepcopy(board);
+            # for i in copy_board:
+            #     for j in xrange(len(i)):
+            #         if i[j] == '.':
+            #             i[j]= 0;
+            #     print i;
+
+
+
             # No falling piece in play, so start a new piece at the top
             fallingPiece = nextPiece
             nextPiece = getNewPiece()
             lastFallTime = time.time() # reset lastFallTime
-            print piece['rotation'];
-            print piece['shape'];
             if not isValidPosition(board, fallingPiece):
                 return # can't fit a new piece on the board, so game over
 
@@ -206,7 +229,7 @@ def runGame():
                     DISPLAYSURF.fill(BGCOLOR)
                     pygame.mixer.music.stop()
                     showTextScreen('Paused') # pause until a key press
-                    pygame.mixer.music.play(-1, 0.0)
+                    #pygame.mixer.music.play(-1, 0.0)
                     lastFallTime = time.time()
                     lastMoveDownTime = time.time()
                     lastMoveSidewaysTime = time.time()
@@ -305,7 +328,6 @@ def terminate():
     pygame.quit()
     sys.exit()
 
-
 def checkForKeyPress():
     # Go through event queue looking for a KEYUP event.
     # Grab KEYDOWN events to remove them from the event queue.
@@ -316,6 +338,74 @@ def checkForKeyPress():
             continue
         return event.key
     return None
+
+
+
+def _calc_height(board):
+    aggre_height=0;
+    begin = False;
+    for i in board:
+        begin = False;
+        for j in i:
+            if j != '.':
+                begin = True;
+            if begin == True:
+                aggre_height+=1;
+    return aggre_height;
+
+
+def _calc_holes(board,aggregate_height_num):
+    num_occupied = 0;
+    for i in board:
+        for j in i:
+            if j != '.':
+                num_occupied+=1;
+
+    return aggregate_height_num - num_occupied;
+
+def _complete_lines(board):
+    #Input: board  
+    #Output: num_complete_lines
+    num_complete_lines = 0;
+    start = False;
+    for row in xrange(len(board[0][:])): #gives row num
+        start = True; 
+        for column in xrange(len(board)):
+            if start == True:
+                if board[row][column] == '.':
+                    start = False;
+            else:
+                break;
+        if start == True:
+            num_complete_lines +=1;
+    return num_complete_lines;
+
+def _blockiness(board):
+    #Input: board
+    #Output: return 0 if not blocky. else some integer
+    prev = -1; #record height of previous row
+    curr_height = 0; 
+    blockiness_score = 0;
+    begin = False;
+    for i in board:
+        begin = False;
+        curr_height=0;
+        for j in i:
+            if j != '.':
+                begin = True;
+            if begin == True:
+                curr_height+=1;
+        #found curr_height of the row 
+        #compare to prev
+        if prev != -1:
+            blockiness_score+=abs(prev-curr_height);
+        prev = curr_height;
+    return blockiness_score
+
+
+def evaluate(board):
+    aggregate_height_num = _calc_height(board);
+    return _blockiness(board)+_complete_lines(board)+_calc_height+_calc_holes(board, aggregate_height_num)+aggregate_height_num;
 
 
 def showTextScreen(text):
