@@ -3,7 +3,7 @@
 # http://inventwithpython.com/pygame
 # Released under a "Simplified BSD" license
 
-import random, time, pygame, sys
+import random, time, pygame, sys, copy
 from pygame.locals import *
 
 FPS = 25
@@ -193,70 +193,20 @@ def runGame():
             fallingPiece = nextPiece
             nextPiece = getNewPiece()
             lastFallTime = time.time() # reset lastFallTime
-            print piece['rotation'];
-            print piece['shape'];
             if not isValidPosition(board, fallingPiece):
                 return # can't fit a new piece on the board, so game over
-
-        checkForQuit()
-        for event in pygame.event.get(): # event handling loop
-            if event.type == KEYUP:
-                if (event.key == K_p):
-                    # Pausing the game
-                    DISPLAYSURF.fill(BGCOLOR)
-                    pygame.mixer.music.stop()
-                    showTextScreen('Paused') # pause until a key press
-                    pygame.mixer.music.play(-1, 0.0)
-                    lastFallTime = time.time()
-                    lastMoveDownTime = time.time()
-                    lastMoveSidewaysTime = time.time()
-                elif (event.key == K_LEFT or event.key == K_a):
-                    movingLeft = False
-                elif (event.key == K_RIGHT or event.key == K_d):
-                    movingRight = False
-                elif (event.key == K_DOWN or event.key == K_s):
-                    movingDown = False
-
-            elif event.type == KEYDOWN:
-                # moving the piece sideways
-                if (event.key == K_LEFT or event.key == K_a) and isValidPosition(board, fallingPiece, adjX=-1):
-                    fallingPiece['x'] -= 1
-                    movingLeft = True
-                    movingRight = False
-                    lastMoveSidewaysTime = time.time()
-
-                elif (event.key == K_RIGHT or event.key == K_d) and isValidPosition(board, fallingPiece, adjX=1):
-                    fallingPiece['x'] += 1
-                    movingRight = True
-                    movingLeft = False
-                    lastMoveSidewaysTime = time.time()
-
-                # rotating the piece (if there is room to rotate)
-                elif (event.key == K_UP or event.key == K_w):
-                    fallingPiece['rotation'] = (fallingPiece['rotation'] + 1) % len(PIECES[fallingPiece['shape']])
-                    if not isValidPosition(board, fallingPiece):
-                        fallingPiece['rotation'] = (fallingPiece['rotation'] - 1) % len(PIECES[fallingPiece['shape']])
-                elif (event.key == K_q): # rotate the other direction
-                    fallingPiece['rotation'] = (fallingPiece['rotation'] - 1) % len(PIECES[fallingPiece['shape']])
-                    if not isValidPosition(board, fallingPiece):
-                        fallingPiece['rotation'] = (fallingPiece['rotation'] + 1) % len(PIECES[fallingPiece['shape']])
-
-                # making the piece fall faster with the down key
-                elif (event.key == K_DOWN or event.key == K_s):
-                    movingDown = True
-                    if isValidPosition(board, fallingPiece, adjY=1):
-                        fallingPiece['y'] += 1
-                    lastMoveDownTime = time.time()
-
-                # move the current piece all the way down
-                elif event.key == K_SPACE:
-                    movingDown = False
-                    movingLeft = False
-                    movingRight = False
-                    for i in range(1, BOARDHEIGHT):
-                        if not isValidPosition(board, fallingPiece, adjY=i):
-                            break
-                    fallingPiece['y'] += i - 1
+        movePlay = bestMove(fallingPiece, board);
+        print movePlay
+        fallingPiece['rotation'] = movePlay[1];
+        while isValidPosition(board, fallingPiece, adjX=-1):
+            fallingPiece['x'] -= 1
+        fallingPiece['x'] += movePlay[0]
+        while isValidPosition(board, fallingPiece, adjY=1):
+            fallingPiece['y'] += 1;
+        print fallingPiece['rotation']
+        addToBoard(board, fallingPiece)
+        score += removeCompleteLines(board)
+        fallingPiece = None;
 
         # handle moving the piece because of user input
         if (movingLeft or movingRight) and time.time() - lastMoveSidewaysTime > MOVESIDEWAYSFREQ:
@@ -373,7 +323,10 @@ def addToBoard(board, piece):
     for x in range(TEMPLATEWIDTH):
         for y in range(TEMPLATEHEIGHT):
             if PIECES[piece['shape']][piece['rotation']][y][x] != BLANK:
-                board[x + piece['x']][y + piece['y']] = piece['color']
+                try:
+                    board[x + piece['x']][y + piece['y']] = piece['color']
+                except:
+                    pass;
 
 
 def getBlankBoard():
@@ -383,8 +336,6 @@ def getBlankBoard():
         board.append([BLANK] * BOARDHEIGHT)
     return board
 
-def findMoves(piece, board):
-    pass;
 def isOnBoard(x, y):
     return x >= 0 and x < BOARDWIDTH and y < BOARDHEIGHT
 
@@ -499,6 +450,139 @@ def drawNextPiece(piece):
     # draw the "next" piece
     drawPiece(piece, pixelx=WINDOWWIDTH-120, pixely=100)
 
+def bestMove(piece, board):
+    bestMove = -1;
+    bestScore = -10000000;
+    rot = 0;
+    for z in range(len(PIECES[piece['shape']])):
+        rot = z;
+        myPiece = copy.deepcopy(piece);
+        myBoard = copy.deepcopy(board);
+        myPiece['rotation'] = z;
+        print myPiece['rotation'];
+        while isValidPosition(myBoard, myPiece, adjX=-1):
+            myPiece['x'] -= 1
+        counter = 0;
+        while isValidPosition(myBoard, myPiece):
+            tempPiece = copy.deepcopy(myPiece);
+            tempBoard = copy.deepcopy(myBoard);
+            while isValidPosition(tempBoard, tempPiece, adjY=1):
+                tempPiece['y'] += 1;
+            addToBoard(tempBoard, tempPiece);
+            score = evaluate(tempBoard);
+            if score > bestScore:
+                bestScore = score;
+                bestMove = [counter, z];
+                print "temp"
+                for ii in tempBoard:
+                    print ii;
+            
+            counter += 1;
+            myPiece['x'] += 1;
+    return bestMove;
+
+def _calc_height(board):
+    aggre_height=0;
+    begin = False;
+    for i in board:
+        begin = False;
+        for j in i:
+            if j != '.':
+                begin = True;
+            if begin == True:
+                aggre_height+=1;
+    return aggre_height;
+
+
+def _calc_holes(board,aggregate_height_num):
+    num_occupied = 0;
+    for i in board:
+        for j in i:
+            if j != '.':
+                num_occupied+=1;
+
+    return aggregate_height_num - num_occupied;
+
+def _complete_lines(board):
+    #Input: board  
+    #Output: num_complete_lines
+    num_complete_lines = 0;
+    start = False;
+    for row in xrange(len(board[0][:])): #gives row num
+        start = True; 
+        for column in xrange(len(board)):
+            if start == True:
+                if board[column][row] == '.':
+                    start = False;
+            else:
+                break;
+        if start == True:
+            num_complete_lines +=1;
+    return num_complete_lines;
+
+def _blockiness(board):
+    #Input: board
+    #Output: return 0 if not blocky. else some integer
+    prev = -1; #record height of previous row
+    curr_height = 0; 
+    blockiness_score = 0;
+    begin = False;
+    for i in board:
+        begin = False;
+        curr_height=0;
+        for j in i:
+            if j != '.':
+                begin = True;
+            if begin == True:
+                curr_height+=1;
+        #found curr_height of the row 
+        #compare to prev
+        if prev != -1:
+            blockiness_score+=abs(prev-curr_height);
+        prev = curr_height;
+    return blockiness_score
+
+
+def evaluate(board):
+    aggregate_height_num = _calc_height(board);
+    a = -.1;
+    b = 0.8;
+    c = -.3;
+    d = -.53;
+    return a*_blockiness(board)+b*_complete_lines(board)+c*_calc_holes(board, aggregate_height_num)+d*aggregate_height_num;
+
+def train(genes, evolutions):    
+    weights = [];
+    for z in genes:
+        a = range(4);
+        for r in a:
+            r = random.random()*2 - 1;
+        weights = weights + [a];
+    for i in evolutions:
+        scores = []
+        for j in weights:
+            scr = scoreWeights(j);
+            j = j + [scr];
+            scores = scores + [scr];
+        minz = min(scores);
+        for j in weights:
+            j[5] -= minz;
+        sumz = sum(scores);
+        for j in weights:
+            j[5] /= sumz;
+            for s in j:
+                s *= j[5];
+        newWeights = range(4);
+        for k in weights:
+            for l in newWeights:
+                newWeights[l] += k[l];
+        for b in weights:
+            b =  newWeights[:] + random.random*0.4 - 0.2;
+
+
+    #move all the way to the left
+    #drop
+    #eval
 
 if __name__ == '__main__':
     main()
