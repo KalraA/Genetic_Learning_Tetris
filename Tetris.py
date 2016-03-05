@@ -7,6 +7,11 @@ import random, time, pygame, sys
 from pygame.locals import *
 from copy import deepcopy 
 
+#####
+
+score = 0
+
+#####
 
 FPS = 25
 WINDOWWIDTH = 640
@@ -178,10 +183,10 @@ def runGame():
     lastMoveDownTime = time.time()
     lastMoveSidewaysTime = time.time()
     lastFallTime = time.time()
+    score = 0;
     movingDown = False # note: there is no movingUp variable
     movingLeft = False
     movingRight = False
-    score = 0
     level, fallFreq = calculateLevelAndFallFreq(score)
 
     fallingPiece = getNewPiece()
@@ -415,11 +420,12 @@ def _blockiness(board):
     return blockiness_score
 
 
-def evaluate(board):
-    block_weight = -0.1;
-    complete_weight = 0.7;
-    height_weight = -0.5;
-    holes_weight = -0.3;
+def evaluate(board,weight):
+    #Input: board, a list of weights [w1,w2,w3,w4]
+    block_weight = weight[0];
+    complete_weight = weight[1];
+    height_weight = weight[2];
+    holes_weight = weight[3];
     height = _calc_height(board);
     blocky = _blockiness(board);
     complete=_complete_lines(board);
@@ -430,6 +436,16 @@ def evaluate(board):
     print ('holes: ' holes);
     score = height_weight*height+block_weight*blocky+complete_weight*complete+holes_weight*holes;
     return score; 
+
+
+def score_weights(board,weights):
+    #Input: board, a list of weights [w1=block,w2=complete,w3=height,w4=hole]
+    #Output: a score
+    total_score = 0;
+    for i in xrange(10):
+        runGame()
+        total_score+=evaluate(board,weight);  #gives a score with weight
+    return total_score;
 
 
 def showTextScreen(text):
