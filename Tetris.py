@@ -195,14 +195,14 @@ def runGame():
 
             ##print board
 
-            for i in board:
-                print i;
+            #for i in board:
+            #    print i;
 
             #aggregate_height_num = _calc_height(board);
             #print aggregate_height_num;
             #print _calc_holes(board,aggregate_height_num);
             ##print board
-
+            evaluate(board);
 
             ##   attemp  ##
             # copy_board = deepcopy(board);
@@ -228,7 +228,19 @@ def runGame():
                     # Pausing the game
                     DISPLAYSURF.fill(BGCOLOR)
                     pygame.mixer.music.stop()
-                    showTextScreen('Paused') # pause until a key press
+
+
+                    ######show pause screen
+
+
+                    #showTextScreen('Paused') # pause until a key press
+
+                    time.sleep(5)
+
+                    #######
+
+
+
                     #pygame.mixer.music.play(-1, 0.0)
                     lastFallTime = time.time()
                     lastMoveDownTime = time.time()
@@ -372,7 +384,7 @@ def _complete_lines(board):
         start = True; 
         for column in xrange(len(board)):
             if start == True:
-                if board[row][column] == '.':
+                if board[column][row] == '.':
                     start = False;
             else:
                 break;
@@ -404,8 +416,20 @@ def _blockiness(board):
 
 
 def evaluate(board):
-    aggregate_height_num = _calc_height(board);
-    return _blockiness(board)+_complete_lines(board)+_calc_height+_calc_holes(board, aggregate_height_num)+aggregate_height_num;
+    block_weight = -0.1;
+    complete_weight = 0.7;
+    height_weight = -0.5;
+    holes_weight = -0.3;
+    height = _calc_height(board);
+    blocky = _blockiness(board);
+    complete=_complete_lines(board);
+    holes=_calc_holes(board, height);
+    print ('height:' height);
+    print ('blocky: ' blocky);
+    print ('complete: ' complete);
+    print ('holes: ' holes);
+    score = height_weight*height+block_weight*blocky+complete_weight*complete+holes_weight*holes;
+    return score; 
 
 
 def showTextScreen(text):
