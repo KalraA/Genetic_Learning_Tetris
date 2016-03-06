@@ -4,7 +4,8 @@
 # Released under a "Simplified BSD" license
 import random, time, pygame, sys, copy
 from pygame.locals import *
-awesomeweights = [-0.034704844360260084, 0.05891846092397469, -0.15570194128016532, -0.06833823623848678]
+#awesomeweights = [-0.034704844360260084, 0.05891846092397469, -0.15570194128016532, -0.06833823623848678]
+awesomeweights = [-0.19567054051713773, 0.4646625751995018, -0.003907222955622618, -0.8603928073654508]
 weighting = [1, 2, 3 ,4]
 FPS = 25
 WINDOWWIDTH = 640
@@ -13,24 +14,6 @@ BOXSIZE = 20
 BOARDWIDTH = 10
 BOARDHEIGHT = 20
 BLANK = '.'
-
-
-
-
-#8 random weights
-#try them:
-# Algorithm:
-#     CHecks all legal moves;
-#     Evlauates all of them:
-        # Checks different features
-        # throws them in a basic nn
-        # by some weights, comes up with an evaluation.
-#     Plays highest evaluation;
-#Record a score
-#Create a new generation
-
-#Species => some weights
-#Generation => set of some weights
 
 MOVESIDEWAYSFREQ = 0.15
 MOVEDOWNFREQ = 0.1
@@ -172,7 +155,7 @@ PIECES = {'S': S_SHAPE_TEMPLATE,
           'O': O_SHAPE_TEMPLATE,
           'T': T_SHAPE_TEMPLATE}
 
-
+#function that runs at the start of the game.
 def main():
     #idgaf
     global FPSCLOCK, DISPLAYSURF, BASICFONT, BIGFONT
@@ -182,29 +165,32 @@ def main():
     BASICFONT = pygame.font.Font('freesansbold.ttf', 18)
     BIGFONT = pygame.font.Font('freesansbold.ttf', 100)
     pygame.display.set_caption('Tetromino')
-    #click to begin
+    #opening screen
     showTextScreen('Tetromino')
-    #weighting is global, and used when game runs
+    #calls the weighting variable
     global weighting
-    #training the waits
-    train_weights = train(10, 10);
-    weighting = train_weights;
+    #creates a set of trained weights
+    #bob = train(10, 10);
+    #set's trained weights to global weights
+    weighting = awesomeweights;
     while True: # game loop
+        #final game, run it, game over, restart
         runGame()
         showTextScreen('Game Over')
 
-
 def scoreWeights(weights):
-    #current sum
+    #the sum so far
     sumz = 0;
     global weighting;
     weighting = weights;
-    for i in range(1):
-        score = runGameTest(); #test version of game
-        sumz += score; 
-    return sumz/1; #averages sum.
+    # ^ editing global weights
+    #go 5 times, and average out the stuff u get
+    for i in range(5):
+        score = runGameTest();
+        sumz += score;
+    return sumz/5;
 
-#actual game.
+
 def runGame():
     # setup variables for the start of the game
     board = getBlankBoard()
@@ -220,33 +206,24 @@ def runGame():
     fallingPiece = getNewPiece()
     nextPiece = getNewPiece()
 
-    while True: # game loop (AI Loop)
+    while True: # game loop
         if fallingPiece == None:
             # No falling piece in play, so start a new piece at the top
             fallingPiece = nextPiece
             nextPiece = getNewPiece()
-            lastFallTime = time.time() # reset lastFallTime (not needed)
-            #enda
+            lastFallTime = time.time() # reset lastFallTime
             if not isValidPosition(board, fallingPiece):
                 return # can't fit a new piece on the board, so game over
-        #finds its moves
-        movePlay = askTareef(fallingPiece, board, 0, nextPiece, True);
+        movePlay = bestMove(fallingPiece, board, 0, nextPiece, True);
         print movePlay
-        #moves play = [xVal, rotation]
         fallingPiece['rotation'] = movePlay[1];
-        #Moves it to the left all the way
         while isValidPosition(board, fallingPiece, adjX=-1):
             fallingPiece['x'] -= 1
-        #This moves it the right, by xVal
         fallingPiece['x'] += movePlay[0]
-        #drops it
         while isValidPosition(board, fallingPiece, adjY=1):
             fallingPiece['y'] += 1;
-        #combine with board
         addToBoard(board, fallingPiece)
-        #increase the score
-        score += removeCompleteLines(board) **2;
-        #remove falling piece
+        score += removeCompleteLines(board)**2
         fallingPiece = None;
 
   
@@ -286,8 +263,8 @@ def runGameTest():
             nextPiece = getNewPiece()
             lastFallTime = time.time() # reset lastFallTime
             if not isValidPosition(board, fallingPiece):
-                return blocks + score*10;# returns the score
-        movePlay = askTareef(fallingPiece, board, 0, nextPiece, False); #this only looks 1 move deep
+                return blocks + score*10;# can't fit a new piece on the board, so game over
+        movePlay = bestMove(fallingPiece, board, 0, nextPiece, False);
         fallingPiece['rotation'] = movePlay[1];
         while isValidPosition(board, fallingPiece, adjX=-1):
             fallingPiece['x'] -= 1
@@ -416,7 +393,6 @@ def isValidPosition(board, piece, adjX=0, adjY=0):
                 return False
     return True
 
-#How many lines have been completed
 def isCompleteLine(board, y):
     # Return True if the line filled with boxes with no gaps.
     for x in range(BOARDWIDTH):
@@ -514,61 +490,50 @@ def drawNextPiece(piece):
     # draw the "next" piece
     drawPiece(piece, pixelx=WINDOWWIDTH-120, pixely=100)
 
-
-#Find best move
-def askTareef(piece, board, depth, np, bool):
+def bestMove(piece, board, depth, np, bool):
     bestMovee = -1;
-    bestScore = -10000;
-    for z in range(len(PIECES[piece['shape']])): #for each rotation
-        myPiece = copy.deepcopy(piece); 
+    bestScore = -10000000;
+    rot = 0;
+    for z in range(len(PIECES[piece['shape']])):
+        rot = z;
+        myPiece = copy.deepcopy(piece);
         myBoard = copy.deepcopy(board);
-        myPiece['rotation'] = z; #set rotation
-        while isValidPosition(myBoard, myPiece, adjX=-1): #Move all the way to the left
+        myPiece['rotation'] = z;
+        while isValidPosition(myBoard, myPiece, adjX=-1):
             myPiece['x'] -= 1
-        counter = 0; #counts the number of right moves
-        while isValidPosition(myBoard, myPiece): #while valid to move right
-            tempPiece = copy.deepcopy(myPiece); #create copies
+        counter = 0;
+        while isValidPosition(myBoard, myPiece):
+            tempPiece = copy.deepcopy(myPiece);
             tempBoard = copy.deepcopy(myBoard);
-            while isValidPosition(tempBoard, tempPiece, adjY=1): #move down as far as can
+            while isValidPosition(tempBoard, tempPiece, adjY=1):
                 tempPiece['y'] += 1;
-            addToBoard(tempBoard, tempPiece); #add to board
+            addToBoard(tempBoard, tempPiece);
             if depth == 1 or bool == False:
-                score = evaluate(tempBoard); #evaluate it
+                score = evaluate(tempBoard);
             else:
-                score = askTareef(copy.deepcopy(np), tempBoard, depth + 1, tempPiece); #or we eval all deeper moves
-                print score;
-            if score > bestScore: #if its better, then update
+                score = bestMove(copy.deepcopy(np), tempBoard, depth + 1, tempPiece, True);
+            if score > bestScore:
                 bestScore = score;
                 bestMovee = [counter, z];
-            #move counter by one, and move it by 1 on x axis
+            
             counter += 1;
             myPiece['x'] += 1;
-
     if depth == 0:
         return bestMovee;
     else:
         return bestScore;
 
-
 def _calc_height(board):
     aggre_height=0;
     begin = False;
-    bobb = False;
     for i in board:
-        currh = 0;
         begin = False;
         for j in i:
             if j != '.':
                 begin = True;
             if begin == True:
                 aggre_height+=1;
-                currh += 1;
-                if currh > 14:
-                    bobb = True;
-    if bobb:
-        return aggre_height*10;
-    else:
-        return aggre_height;
+    return aggre_height;
 
 
 def _calc_holes(board,aggregate_height_num):
@@ -641,11 +606,11 @@ def train(genes, evolutions):
         a[r] = -1;
         weights = weights + [a[:]];
         a[r] = 0;
-    for r in range(genes):
-        for t in range(len(a)):
-            a[t] = random.random()*2 - 1;
-        weights = weights + [a[:]];
-    #evolves
+    # for r in range(genes):
+    #     for t in range(len(a)):
+    #         a[t] = random.random()*2 - 1;
+    #     weights = weights + [a[:]];
+    #evolves;
     for i in range(evolutions):
         print "Gen: " + str(i);
         scores = []
@@ -654,55 +619,35 @@ def train(genes, evolutions):
             print scr;
             weights[j] = weights[j] + [scr];
             scores = scores + [scr];
-        # minz = min(scores);
-        # for j in range(len(weights)):
-        #     weights[j][4] -= minz;
-        #     scores[j] -= minz;
-        # sumz = sum(scores);
-        # for j in range(len(weights)):
-        #     weights[j][4] = float(weights[j][4]) / float(sumz);
-        #     for s in range(len(weights[j]) - 1):
-        #         weights[j][s] *= weights[j][4];
+        minz = min(scores);
+        for j in range(len(weights)):
+            weights[j][4] -= minz;
+            scores[j] -= minz;
+        sumz = sum(scores);
+        for j in range(len(weights)):
+            weights[j][4] = float(weights[j][4]) / float(sumz);
+            for s in range(len(weights[j]) - 1):
+                weights[j][s] *= weights[j][4];
+        newWeights = range(4);
+        for ji in range(len(newWeights)):
+            newWeights[ji] = 0;
+        for k in range(len(weights)):
+            for l in range(len(newWeights)):
+                newWeights[l] += weights[k][l];
         weights.sort(grtr);
-        newWeights = [];
-        topN = []
-        for kkk in range(len(weights)):
-            if float(weights[kkk][4])/float(weights[0][4]) > 0.8:
-                print 'yo';
-                topN = topN + [weights[kkk]]
-        print len(topN);
-        for q in range(genes - len(topN)):
-            aa = range(4);
-            for qq in range(4):
-                bill = random.random();
-                for yz in range(len(topN)):
-                    diffy = (float(1) - float(yz + 1)*(float(1/float(len(topN)))))
-           
-                    if bill > diffy:
-                        aa[qq] = topN[yz][qq];
-                        break;
-            print aa;
-            newWeights = newWeights + [aa];
-        weights = newWeights
-        # for ji in range(len(newWeights)):
-        #     newWeights[ji] = 0;
-        # for k in range(len(weights)):
-        #     for l in range(len(newWeights)):
-        #         newWeights[l] += weights[k][l];
-        # print weights;
-        # bestWeights = weights[0];
-        # weights = []
-        # for b in range(genes):
-        #     weights = weights + [newWeights[:]];
+        print weights;
+        bestWeights = weights[0];
+        weights = []
+        for b in range(genes):
+            weights = weights + [newWeights[:]];
         for g in range(len(weights)):
             for h in range(len(weights[g])):
-                weights[g][h] +=  (random.random()*0.3 - 0.15)/(i + 1);
+                weights[g][h] +=  (random.random()*0.4 - 0.2)/(i + 1);
                 if weights[g][h] > 1:
                     weights[g][h] = 1;
                 elif weights[g][h] < -1:
                     weights[g][h] = -1;
-        for b in range(len(topN)):
-            weights = weights + [topN[b][:4]]
+        weights = weights + [bestWeights[:4]];
         print weights;
 
     for j in range(len(weights)):
